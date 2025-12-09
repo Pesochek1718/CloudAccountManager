@@ -84,7 +84,7 @@ def create_accounts_table(window):
     # Sorting disabled as requested
     
     # Load sample data
-    load_sample_data(window)
+    # load_sample_data(window)
     
     # Connect signals - но  update_status_bar, он добавится позже
     # table.selectionModel().selectionChanged.connect(window.update_status_bar)

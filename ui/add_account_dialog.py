@@ -1257,4 +1257,4 @@ class AddAccountDialog(QDialog):
         """Clean up timers on close"""
         if self.totp_timer:
             self.totp_timer.stop()
-        event.accept()
+        event.accept()

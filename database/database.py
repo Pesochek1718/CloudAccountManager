@@ -1,4 +1,4 @@
-﻿"""
+"""
 Database manager for the application
 """
 

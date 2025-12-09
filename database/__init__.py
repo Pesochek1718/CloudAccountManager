@@ -1,4 +1,4 @@
-﻿"""
+"""
 Database package for Cloud Account Manager
 """
 

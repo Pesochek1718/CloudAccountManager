@@ -1,255 +1,200 @@
-﻿"""
-Cloud Account Manager - Main Application Entry Point
-"""
-
 import sys
 import os
-from pathlib import Path
+import traceback
 
-# Debug: Print current working directory and paths
-print("=" * 50)
-print("CLOUD ACCOUNT MANAGER - STARTING")
-print("=" * 50)
-print(f"📁 Current working directory: {os.getcwd()}")
-print(f"📁 Script location: {os.path.dirname(os.path.abspath(__file__))}")
-print(f"📁 Python version: {sys.version}")
+print('='*60)
+print('CLOUD ACCOUNT MANAGER - FULLY WORKING')
+print('='*60)
 
-# Check if we're running from PyInstaller bundle
-if getattr(sys, 'frozen', False):
-    print("⚡ Running as bundled executable")
-    application_path = sys._MEIPASS
-else:
-    application_path = os.path.dirname(os.path.abspath(__file__))
-    print(f"🐍 Running as Python script from: {application_path}")
+# Add paths
+project_path = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, project_path)
 
-# Add project directories to Python path
-sys.path.insert(0, application_path)
-sys.path.insert(0, os.path.join(application_path, 'ui'))
-sys.path.insert(0, os.path.join(application_path, 'models'))
-sys.path.insert(0, os.path.join(application_path, 'database'))
-sys.path.insert(0, os.path.join(application_path, 'services'))
-sys.path.insert(0, os.path.join(application_path, 'utils'))
+print(f'Project: {project_path}')
 
 try:
+    # Imports
     import yaml
     from PyQt6.QtWidgets import QApplication, QMessageBox
     from PyQt6.QtCore import Qt
-    from PyQt6.QtGui import QIcon
-    
-    from ui.main_window import MainWindow
+    from PyQt6.QtGui import QIcon, QStandardItem
     from database.database import DatabaseManager
+    from ui.main_window import MainWindow
+    from models.account import Account
     
-    print("✅ All imports successful")
+    print('All imports successful')
     
-except ImportError as e:
-    print(f"❌ Import error: {e}")
-    print("Please install required packages:")
-    print("pip install PyQt6 pyyaml")
-    sys.exit(1)
-
-def load_config():
-    """Load configuration from YAML file"""
-    config_paths = [
-        'config.yaml',
-        os.path.join(application_path, 'config.yaml'),
-        os.path.join(os.path.dirname(application_path), 'config.yaml')
-    ]
+    # Load config
+    config_path = os.path.join(project_path, 'config.yaml')
+    if os.path.exists(config_path):
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        print('Config loaded')
+    else:
+        config = {'database': {'url': 'sqlite:///cloud_accounts.db'}}
+        print('Using default config')
     
-    for config_path in config_paths:
-        if os.path.exists(config_path):
-            try:
-                with open(config_path, 'r') as f:
-                    config = yaml.safe_load(f)
-                print(f"✅ Config loaded from: {config_path}")
-                return config
-            except Exception as e:
-                print(f"⚠️ Error loading config from {config_path}: {e}")
+    # Initialize DB
+    db_url = config.get('database', {}).get('url', 'sqlite:///cloud_accounts.db')
+    print(f'Database URL: {db_url}')
     
-    print("⚠️ Config file not found, using defaults")
-    return {
-        'database': {'url': 'sqlite:///cloud_accounts.db'},
-        'ui': {'theme': 'dark', 'language': 'ru'},
-        'cloud_providers': {
-            'aws': {'enabled': True},
-            'digitalocean': {'enabled': True},
-            'linode': {'enabled': True},
-            'azure': {'enabled': True}
-        }
-    }
-
-def check_dependencies():
-    """Check if all required dependencies are installed"""
-    missing_deps = []
+    db_manager = DatabaseManager('config.yaml')
+    print('Database initialized')
     
-    try:
-        import pyotp
-    except ImportError:
-        missing_deps.append("pyotp")
-        print("⚠️ pyotp not installed. MFA TOTP codes will not be generated.")
-        print("   Install with: pip install pyotp")
+    # Add refresh_table method to MainWindow
+    original_main_window = MainWindow
     
-    try:
-        import boto3
-    except ImportError:
-        missing_deps.append("boto3")
-        print("⚠️ boto3 not installed. AWS checking will not work.")
-        print("   Install with: pip install boto3")
-    
-    return missing_deps
-
-def setup_database(config):
-    """Setup and initialize database"""
-    print("\n" + "=" * 50)
-    print("DATABASE SETUP")
-    print("=" * 50)
-    
-    try:
-        db_manager = DatabaseManager()
-        
-        # Print database info
-        if hasattr(db_manager, 'db_path'):
-            print(f"📁 Database file: {db_manager.db_path}")
-            if os.path.exists(db_manager.db_path):
-                file_size = os.path.getsize(db_manager.db_path)
-                print(f"📁 Database exists, size: {file_size} bytes")
-            else:
-                print("📁 Database file does not exist yet (will be created)")
-        
-        # Test database connection
-        print("🔍 Testing database connection...")
-        test_accounts = db_manager.get_all_accounts()
-        print(f"✅ Database connected. Found {len(test_accounts)} existing accounts.")
-        
-        return db_manager
-        
-    except Exception as e:
-        print(f"❌ Database setup failed: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        # Try to create database in current directory
-        print("\n🔄 Trying alternative database location...")
-        try:
-            # Force SQLite to use current directory
-            config['database']['url'] = 'sqlite:///cloud_accounts.db'
-            db_manager = DatabaseManager()
-            print("✅ Database created in current directory")
-            return db_manager
-        except Exception as e2:
-            print(f"❌ Alternative database setup also failed: {e2}")
-            return None
-
-def main():
-    """Main application entry point"""
-    print("\n" + "=" * 50)
-    print("APPLICATION INITIALIZATION")
-    print("=" * 50)
-    
-    # Load configuration
-    config = load_config()
-    print(f"🎨 UI Theme: {config.get('ui', {}).get('theme', 'dark')}")
-    print(f"🌐 Language: {config.get('ui', {}).get('language', 'ru')}")
-    
-    # Check dependencies
-    missing_deps = check_dependencies()
-    
-    # Setup database
-    db_manager = setup_database(config)
-    if not db_manager:
-        print("❌ Failed to initialize database. Exiting.")
-        sys.exit(1)
-    
-    # Create Qt application
-    print("\n" + "=" * 50)
-    print("STARTING QT APPLICATION")
-    print("=" * 50)
-    
-    # High DPI support
-    QApplication.setHighDpiScaleFactorRoundingPolicy(
-        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
-    )
-    
-    app = QApplication(sys.argv)
-    app.setApplicationName("Cloud Account Manager")
-    app.setApplicationVersion("1.0.0")
-    app.setOrganizationName("CloudAccountManager")
-    
-    # Set application style
-    app.setStyle('Fusion')
-    
-    # Set application icon if exists
-    icon_paths = [
-        'logo.png',
-        os.path.join(application_path, 'logo.png'),
-        os.path.join(application_path, 'ui', 'logo.png')
-    ]
-    
-    for icon_path in icon_paths:
-        if os.path.exists(icon_path):
-            try:
-                app.setWindowIcon(QIcon(icon_path))
-                print(f"✅ Application icon loaded from: {icon_path}")
-                break
-            except Exception as e:
-                print(f"⚠️ Could not load icon from {icon_path}: {e}")
-    
-    # Create and show main window
-    try:
-        print("🪟 Creating main window...")
-        window = MainWindow(db_manager, config)
-        window.show()
-        
-        print("✅ Application started successfully!")
-        print("\n" + "=" * 50)
-        print("READY")
-        print("=" * 50)
-        
-        # Show warning about missing dependencies
-        if missing_deps:
-            msg = "⚠️ Some dependencies are missing:\n\n"
-            for dep in missing_deps:
-                msg += f"• {dep}\n"
-            msg += "\nSome features may not work properly.\n"
-            msg += "Install with: pip install " + " ".join(missing_deps)
+    class PatchedMainWindow(original_main_window):
+        def __init__(self):
+            super().__init__()
+            self.db_manager = db_manager
             
-            QMessageBox.warning(window, "Missing Dependencies", msg)
+        def refresh_table(self):
+            try:
+                # Clear table
+                self.model.removeRows(0, self.model.rowCount())
+                
+                # Load from database
+                session = self.db_manager.get_session()
+                accounts = session.query(Account).all()
+                session.close()
+                
+                # Add to table
+                for account in accounts:
+                    items = []
+                    
+                    # Checkbox
+                    checkbox_item = QStandardItem()
+                    checkbox_item.setCheckable(True)
+                    checkbox_item.setCheckState(Qt.CheckState.Unchecked)
+                    checkbox_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    items.append(checkbox_item)
+                    
+                    # ID
+                    id_item = QStandardItem(str(account.id))
+                    id_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    items.append(id_item)
+                    
+                    # Provider
+                    provider_item = QStandardItem(account.provider)
+                    items.append(provider_item)
+                    
+                    # Email
+                    email_item = QStandardItem(account.email)
+                    items.append(email_item)
+                    
+                    # Region
+                    region_item = QStandardItem(account.region or '')
+                    items.append(region_item)
+                    
+                    # Status
+                    status_text = 'Active' if (account.is_active if hasattr(account, 'is_active') else True) else 'Error'
+                    status_item = QStandardItem(status_text)
+                    items.append(status_item)
+                    
+                    # Quota
+                    quota_item = QStandardItem('N/A')
+                    items.append(quota_item)
+                    
+                    # Last check
+                    last_check = account.last_check.strftime('%Y-%m-%d %H:%M') if account.last_check else 'Never'
+                    items.append(QStandardItem(last_check))
+                    
+                    # Actions
+                    actions_item = QStandardItem('Actions')
+                    actions_item.setEditable(False)
+                    items.append(actions_item)
+                    
+                    # Make non-editable
+                    for idx, item in enumerate(items):
+                        if idx != 0:
+                            item.setEditable(False)
+                    
+                    self.model.appendRow(items)
+                
+                print(f'Table refreshed with {len(accounts)} accounts')
+                if hasattr(self, 'update_status_bar'):
+                    self.update_status_bar()
+                
+            except Exception as e:
+                print(f'Error refreshing table: {e}')
+                traceback.print_exc()
         
-        # Start application event loop
-        exit_code = app.exec()
+        def add_account(self):
+            """Open modal dialog to add account"""
+            try:
+                from ui.add_account_dialog import AddAccountDialog
+                dialog = AddAccountDialog(self)
+                if dialog.exec():
+                    # Refresh table after successful addition
+                    self.refresh_table()
+            except Exception as e:
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.critical(self, "Error", f"Failed to open dialog: {str(e)}")
         
-        print("\n" + "=" * 50)
-        print("APPLICATION SHUTDOWN")
-        print("=" * 50)
-        
-        # Cleanup
-        if db_manager:
-            db_manager.close()
-            print("✅ Database connection closed")
-        
-        print(f"🔄 Exit code: {exit_code}")
-        return exit_code
-        
-    except Exception as e:
-        print(f"❌ Failed to create main window: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        # Show error dialog
-        error_msg = f"Failed to start application:\n\n{str(e)}\n\n"
-        error_msg += "Please check the console for details."
-        QMessageBox.critical(None, "Application Error", error_msg)
-        
-        return 1
-
-if __name__ == "__main__":
-    try:
-        exit_code = main()
-        sys.exit(exit_code)
-    except KeyboardInterrupt:
-        print("\n\n⚠️ Application interrupted by user")
-        sys.exit(0)
-    except Exception as e:
-        print(f"\n❌ Unhandled exception: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+        def delete_selected(self):
+            selected_rows = self.get_selected_rows()
+            
+            if not selected_rows:
+                QMessageBox.warning(self, 'Warning', 'Please select accounts to delete')
+                return
+            
+            reply = QMessageBox.question(
+                self, 'Confirm',
+                f'Delete {len(selected_rows)} accounts from database?',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                deleted_count = 0
+                for row in selected_rows:
+                    source_index = self.proxy_model.mapToSource(self.proxy_model.index(row, 0))
+                    source_row = source_index.row()
+                    
+                    # Get account ID from table
+                    id_item = self.model.item(source_row, 1)
+                    if id_item:
+                        account_id = int(id_item.text())
+                        if self.db_manager.delete_account(account_id):
+                            deleted_count += 1
+                
+                # Refresh table
+                self.refresh_table()
+                QMessageBox.information(self, 'Success', f'Deleted {deleted_count} accounts')
+    
+    # Start application
+    app = QApplication(sys.argv)
+    app.setApplicationName('Cloud Account Manager')
+    
+    print('')
+    print('Creating main window...')
+    window = PatchedMainWindow()
+    
+    # Load icon
+    icon_path = os.path.join(project_path, 'logo.png')
+    if os.path.exists(icon_path):
+        window.setWindowIcon(QIcon(icon_path))
+        print(f'Icon loaded: {icon_path}')
+    
+    window.show()
+    
+    # Refresh table with initial data
+    window.refresh_table()
+    
+    print('')
+    print('Application started!')
+    print('='*60)
+    print('Features:')
+    print('  - Add accounts via Add button (uses ORIGINAL dialog)')
+    print('  - Delete accounts via Delete button')
+    print('  - Data saved to database')
+    print('='*60)
+    
+    sys.exit(app.exec())
+    
+except Exception as e:
+    print(f'')
+    print(f'Fatal error: {e}')
+    traceback.print_exc()
+    input('')
+    input('Press Enter to exit...')
