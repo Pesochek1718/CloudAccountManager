@@ -1,0 +1,16 @@
+﻿database:
+  url: "sqlite:///cloud_accounts.db"
+
+ui:
+  theme: "dark"
+  language: "ru"
+
+cloud_providers:
+  aws:
+    enabled: true
+  digitalocean:
+    enabled: true
+  linode:
+    enabled: true
+  azure:
+    enabled: true

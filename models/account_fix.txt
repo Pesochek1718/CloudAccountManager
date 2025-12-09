@@ -1,0 +1,37 @@
+﻿    @classmethod
+    def from_dict(cls, data):
+        """Create account from dictionary - FIXED VERSION"""
+        account = cls()
+        account.provider = data.get('provider', '')
+        account.email = data.get('email', '')
+        account.comment = data.get('comment', '')
+        
+        if account.provider == 'AWS':
+            account.password = data.get('password', '')
+            account.mfa_secret = data.get('mfa_secret', '')
+            account.access_key = data.get('access_key', '')
+            account.secret_key = data.get('secret_key', '')
+            account.region = data.get('region', '')
+            account.country = data.get('country', '')
+        elif account.provider == 'DigitalOcean':
+            account.email_password = data.get('email_password', '')
+            account.do_password = data.get('do_password', '')
+            account.do_2fa_secret = data.get('2fa_secret', '')
+            account.limits = data.get('limits', '')
+            account.country = data.get('country', '')
+            account.payment_method = data.get('payment_method', '')
+        elif account.provider == 'Linode':
+            account.email_password = data.get('email_password', '')
+            account.linode_login = data.get('linode_login', '')
+            account.linode_password = data.get('linode_password', '')
+            account.linode_2fa_secret = data.get('2fa_secret', '')
+            account.api_key = data.get('api_key', '')
+            account.payment_method = data.get('payment_method', 'Card')
+            account.linode_country = data.get('country', '')
+        elif account.provider == 'Azure':
+            account.azure_password = data.get('azure_password', '')
+            account.azure_2fa_secret = data.get('2fa_secret', '')
+            account.subscription = data.get('subscription', 'Pay as You Go')
+            account.azure_country = data.get('country', '')
+        
+        return account
